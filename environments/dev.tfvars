@@ -1,6 +1,6 @@
 environment = "dev"
 location    = "westeurope"
-admin_password = "Password@2013"
+admin_password = "<password>"
 admin_username      = "terraform"
 
 vms = {

@@ -4,9 +4,9 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  storageAccountName: 'azstoretfstate'
-  containerName: 'tfstate'
-  resourceGroupName: 'RG-IND-TFSTATE'
+  storageAccountName: '<your storage name >'
+  containerName: '<container name>'
+  resourceGroupName: '<resource group name>'
   tfStateKey: '$(ENVIRONMENT)/terrafrom.tfstate'
 
 stages:
@@ -28,7 +28,7 @@ stages:
       inputs:
         provider: 'azurerm'
         command: 'init'
-        backendServiceArm: 'SP_Connection'
+        backendServiceArm: '<servive connection name>'
         backendAzureRmResourceGroupName: '$(resourceGroupName)'
         backendAzureRmStorageAccountName: '$(storageAccountName)'
         backendAzureRmContainerName: '$(containerName)'
@@ -59,7 +59,7 @@ stages:
       inputs:
         provider: 'azurerm'
         command: 'init'
-        backendServiceArm: 'SP_Connection'
+        backendServiceArm: '<service connection name>'
         backendAzureRmResourceGroupName: '$(resourceGroupName)'
         backendAzureRmStorageAccountName: '$(storageAccountName)'
         backendAzureRmContainerName: '$(containerName)'
@@ -70,7 +70,7 @@ stages:
       inputs:
         provider: 'azurerm'
         command: 'plan'
-        environmentServiceNameAzureRM: 'SP_Connection'
+        environmentServiceNameAzureRM: '<service connection name>'
         commandOptions: '-var-file=environments/$(ENVIRONMENT).tfvars'
         additionalArguments: '-out=tfplan'
 
@@ -79,7 +79,7 @@ stages:
       inputs:
         provider: 'azurerm'
         command: 'apply'
-        environmentServiceNameAzureRM: 'SP_Connection'
+        environmentServiceNameAzureRM: '<service connection name>'
         additionalArguments: 'tfplan'
         commandOptions: '-var-file=environments/$(ENVIRONMENT).tfvars'
 
@@ -91,7 +91,7 @@ stages:
         additionalArguments: '-json'
         outputTo: 'file'
         outputFile: 'terraformOutput.json'
-        environmentServiceNameAzureRM: 'SP_Connection'
+        environmentServiceNameAzureRM: '<service connection name>'
 
     - bash: |
         set -e
