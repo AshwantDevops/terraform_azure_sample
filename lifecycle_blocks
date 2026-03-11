@@ -1,0 +1,21 @@
+# This protects the VM if someone modifies Terraform later.
+
+lifecycle {
+  prevent_destroy = true
+}
+
+# Create new resource before deleting old one.
+
+lifecycle {
+  create_before_destroy = true
+}
+
+# Ignore changes (common for Azure environments).
+
+lifecycle {
+  ignore_changes = [
+    tags
+  ]
+}
+
+# 

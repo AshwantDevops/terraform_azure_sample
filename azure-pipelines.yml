@@ -1,0 +1,129 @@
+trigger: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  storageAccountName: 'azstoretfstate'
+  containerName: 'tfstate'
+  resourceGroupName: 'RG-IND-TFSTATE'
+  tfStateKey: '$(ENVIRONMENT)/terrafrom.tfstate'
+
+stages:
+
+# -------------------------
+# STAGE 1 - VALIDATE
+# -------------------------
+- stage: tfvalidate
+  jobs:
+  - job: validate
+    steps:
+    - task: TerraformInstaller@1
+      displayName: 'Install'
+      inputs:
+        terraformVersion: 'latest'
+
+    - task: TerraformTask@5
+      displayName: INIT
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        backendServiceArm: 'SP_Connection'
+        backendAzureRmResourceGroupName: '$(resourceGroupName)'
+        backendAzureRmStorageAccountName: '$(storageAccountName)'
+        backendAzureRmContainerName: '$(containerName)'
+        backendAzureRmKey: '$(tfStateKey)'
+
+    - task: TerraformTask@5
+      displayName: VALIDATE
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+
+# -------------------------
+# STAGE 2 - DEPLOY
+# -------------------------
+- stage: tfdeploy
+  dependsOn: tfvalidate
+  condition: succeeded()
+  jobs:
+  - job: apply
+    steps:
+    - task: TerraformInstaller@1
+      displayName: 'Install'
+      inputs:
+        terraformVersion: 'latest'
+
+    - task: TerraformTask@5
+      displayName: INIT
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        backendServiceArm: 'SP_Connection'
+        backendAzureRmResourceGroupName: '$(resourceGroupName)'
+        backendAzureRmStorageAccountName: '$(storageAccountName)'
+        backendAzureRmContainerName: '$(containerName)'
+        backendAzureRmKey: '$(tfStateKey)'
+
+    - task: TerraformTask@5
+      displayName: PLAN
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        environmentServiceNameAzureRM: 'SP_Connection'
+        commandOptions: '-var-file=environments/$(ENVIRONMENT).tfvars'
+        additionalArguments: '-out=tfplan'
+
+    - task: TerraformTask@5
+      displayName: APPLY
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        environmentServiceNameAzureRM: 'SP_Connection'
+        additionalArguments: 'tfplan'
+        commandOptions: '-var-file=environments/$(ENVIRONMENT).tfvars'
+
+    - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTask@5
+      displayName: 'Terraform Output'
+      inputs:
+        provider: 'azurerm'
+        command: 'output'
+        additionalArguments: '-json'
+        outputTo: 'file'
+        outputFile: 'terraformOutput.json'
+        environmentServiceNameAzureRM: 'SP_Connection'
+
+    - bash: |
+        set -e
+
+        echo "Finding terraform output file..."
+
+        OUTPUT_FILE=$(ls output-*.json | head -n 1)
+
+        if [ -z "$OUTPUT_FILE" ]; then
+          echo "No Terraform output file found!"
+          exit 1
+        fi
+
+        echo "Using file: $OUTPUT_FILE"
+
+        {
+          echo "==================================="
+          echo " Terraform Deployment Summary"
+          echo "==================================="
+          echo ""
+          echo "Output Name | Value"
+          echo "----------------------------"
+          jq -r 'to_entries[] | "\(.key) | \(.value.value)"' "$OUTPUT_FILE"
+          echo ""
+          echo "Generated on: $(date)"
+        } > create.txt
+
+        cp create.txt "$(Build.ArtifactStagingDirectory)/"
+      displayName: 'Format Output File'
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Terraform Summary'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'TerraformSummary'
